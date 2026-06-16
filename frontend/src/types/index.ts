@@ -14,6 +14,8 @@ export interface Device {
   port: number
   slaveId: number
   online: boolean
+  offlineReason?: string
+  lastSeenAt?: number
   registers: ModbusRegister[]
 }
 

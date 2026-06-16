@@ -19,12 +19,21 @@
       <h3 class="text-gray-400 text-xs mt-2">设备列表</h3>
       <div v-for="d in store.devices" :key="d.id" @click="store.selectedDevice = d"
         class="bg-gray-800 rounded p-2 cursor-pointer text-sm"
-        :class="store.selectedDevice?.id === d.id ? 'ring-1 ring-orange-500' : ''">
+        :class="[store.selectedDevice?.id === d.id ? 'ring-1 ring-orange-500' : '', !d.online ? 'opacity-60' : '']">
         <div class="flex justify-between">
           <span>{{ d.name }}</span>
-          <span class="w-2 h-2 rounded-full mt-1.5" :class="d.online ? 'bg-green-500' : 'bg-red-500'"></span>
+          <span class="flex items-center gap-1">
+            <span v-if="!d.online" class="text-[10px] text-red-400">离线</span>
+            <span class="w-2 h-2 rounded-full mt-1.5" :class="d.online ? 'bg-green-500' : 'bg-red-500'"></span>
+          </span>
         </div>
         <div class="text-xs text-gray-500">{{ d.ip }}:{{ d.port }} [{{ d.slaveId }}]</div>
+        <div v-if="!d.online && d.offlineReason" class="mt-1 text-[11px] text-red-400 bg-red-900/30 rounded px-1.5 py-0.5">
+          ⚠ {{ d.offlineReason }}
+        </div>
+        <div v-if="d.lastSeenAt" class="mt-1 text-[10px] text-gray-500">
+          最后上报: {{ formatLastSeen(d.lastSeenAt) }}
+        </div>
       </div>
 
       <div v-if="store.criticalAlarms.length" class="bg-red-900/50 rounded p-2 mt-2">
@@ -43,14 +52,30 @@
     <div class="flex-1 flex flex-col gap-3 p-4 overflow-y-auto">
       <!-- Register Gauges -->
       <div class="grid grid-cols-4 gap-3">
-        <div v-for="d in store.devices" :key="d.id" v-for="r in d.registers" :k="r.address"
-          class="bg-gray-900 rounded-xl p-3">
-          <div class="text-xs text-gray-400">{{ d.name }}</div>
-          <div class="text-2xl font-bold" :class="d.online ? 'text-orange-400' : 'text-gray-600'">
-            {{ typeof r.value === 'number' ? r.value.toFixed(r.value > 100 ? 0 : 1) : r.value ? 'ON' : 'OFF' }}
+        <template v-for="d in store.devices" :key="d.id">
+          <div v-for="r in d.registers" :key="`${d.id}_${r.address}`"
+            class="bg-gray-900 rounded-xl p-3 relative"
+            :class="!d.online ? 'border border-red-900/50' : ''">
+            <div class="flex justify-between items-start">
+              <div class="text-xs text-gray-400">{{ d.name }}</div>
+              <span v-if="!d.online" class="text-[10px] text-red-400 bg-red-900/30 px-1.5 py-0.5 rounded">
+                离线
+              </span>
+            </div>
+            <div class="text-2xl font-bold mt-1" :class="d.online ? 'text-orange-400' : 'text-gray-600'">
+              {{ typeof r.value === 'number' ? r.value.toFixed(r.value > 100 ? 0 : 1) : r.value ? 'ON' : 'OFF' }}
+            </div>
+            <div class="text-xs text-gray-500">{{ r.name }} {{ r.unit }}</div>
+            <div v-if="!d.online" class="mt-2 pt-2 border-t border-gray-800">
+              <div v-if="d.offlineReason" class="text-[10px] text-red-400 truncate" :title="d.offlineReason">
+                ⚠ {{ d.offlineReason }}
+              </div>
+              <div v-if="d.lastSeenAt" class="text-[10px] text-gray-600 mt-0.5">
+                最后上报: {{ formatLastSeen(d.lastSeenAt) }}
+              </div>
+            </div>
           </div>
-          <div class="text-xs text-gray-500">{{ r.name }} {{ r.unit }}</div>
-        </div>
+        </template>
       </div>
 
       <!-- Chart -->
@@ -85,6 +110,19 @@ import TrendChart from './components/TrendChart.vue'
 
 const store = useModbusStore()
 let timer: number | null = null
+
+function formatLastSeen(timestamp: number): string {
+  const diff = Date.now() - timestamp
+  const sec = Math.floor(diff / 1000)
+  const min = Math.floor(sec / 60)
+  const hour = Math.floor(min / 60)
+  const day = Math.floor(hour / 24)
+  if (day > 0) return `${day}天前`
+  if (hour > 0) return `${hour}小时前`
+  if (min > 0) return `${min}分钟前`
+  if (sec > 0) return `${sec}秒前`
+  return '刚刚'
+}
 
 function startPoll() {
   store.isPolling = true
