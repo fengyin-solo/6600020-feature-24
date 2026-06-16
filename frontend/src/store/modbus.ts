@@ -96,10 +96,8 @@ export const useModbusStore = defineStore('modbus', () => {
     d.online = !d.online
     if (d.online) {
       d.offlineReason = undefined
-      d.lastSeenAt = Date.now()
     } else {
       d.offlineReason = '手动触发离线'
-      d.lastSeenAt = Date.now()
     }
   }
 
